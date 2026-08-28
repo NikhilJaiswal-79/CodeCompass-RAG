@@ -1,0 +1,21 @@
+# Web & UI Framework
+gradio
+
+# Core RAG Agent Framework
+langgraph
+langchain-core
+google-genai
+
+# Embeddings & Vector Search
+chromadb
+sentence-transformers
+rank-bm25
+
+# Code Parsing (Core AST)
+tree-sitter
+tree-sitter-python
+tree-sitter-javascript
+
+# Utilities
+python-dotenv
+pydantic

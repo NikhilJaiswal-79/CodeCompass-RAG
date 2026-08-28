@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/
+chroma_db/
+lambda_pkg/
+safestep_test/
+safestep_test2/
+temp_clone_test/
+debug_out.txt

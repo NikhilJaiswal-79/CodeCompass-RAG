@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ContribLens - Agentic Code Search</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar for Repository Setup -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="icon">🔍</span>
+                <h1>ContribLens</h1>
+            </div>
+            
+            <div class="ingest-section">
+                <h3>Ingest Repository</h3>
+                <p>Enter a GitHub URL to index the codebase.</p>
+                <div class="input-group">
+                    <input type="text" id="repo-url-input" placeholder="https://github.com/owner/repo" />
+                    <button id="ingest-btn">Index Repo</button>
+                </div>
+                <div id="status-display" class="status-box hidden">
+                    <div class="status-indicator"></div>
+                    <span id="status-text">Pending...</span>
+                </div>
+            </div>
+            
+            <div class="current-repo-section">
+                <h3>Active Repository</h3>
+                <div class="repo-badge" id="current-repo-badge">None</div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Interface -->
+        <main class="chat-container">
+            <header class="chat-header">
+                <h2>Ask the Agent</h2>
+                <p class="subtitle">Powered by LangGraph & Llama-3</p>
+            </header>
+            
+            <div class="chat-history" id="chat-history">
+                <div class="message system-message">
+                    <div class="message-content">
+                        Welcome to ContribLens! Please index a repository in the sidebar to get started.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <form id="chat-form">
+                    <input type="text" id="chat-input" placeholder="e.g. How do I add a new database migration?" disabled />
+                    <button type="submit" id="send-btn" disabled>Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

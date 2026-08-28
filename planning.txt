@@ -1,0 +1,124 @@
+# ContribLens — Final Build Prompt for Claude Code
+
+Paste this into Claude Code as your starting instruction. Work through it stage by stage — don't ask Claude Code to build everything in one shot. Confirm each stage works before moving to the next.
+
+---
+
+## Project Overview (give this context first)
+
+I'm building **ContribLens** — a tool that helps open-source contributors navigate and understand *any* unfamiliar codebase before making a pull request. It works on any repo thrown at it (not one fixed codebase), using:
+
+1. **AST-based chunking** (via tree-sitter, multi-language) so every chunk is a complete function/class, never a broken fragment
+2. **Hybrid retrieval** — dense vector search (ChromaDB, embedded/local) + BM25 keyword search, fused with Reciprocal Rank Fusion
+3. **A code dependency graph** (call graph + import graph) extracted from the AST, used to answer "blast radius" questions — what breaks if I change this function, what calls this, what does this depend on
+4. **An agentic retrieval loop** built in LangGraph that classifies each query (conceptual vs structural vs guideline vs mixed) and routes it to the right retrieval method, with the ability to loop back for more context before answering
+5. **An eval pipeline** that auto-generates ground truth from a repo's own history: closed GitHub issues + the merged PR that resolved them become (query, expected files/functions) pairs — no manual ground-truth writing required. An LLM-as-judge pass filters out low-quality mined pairs (vague issues, docs-only PRs) so I only need to spot-check a sample instead of reviewing all of them. Measures Precision@k, Recall@k, MRR comparing vector-only vs hybrid retrieval, logged via LangSmith. A second LLM-as-judge pass scores final answer faithfulness/groundedness (Layer 2) — did the answer actually stick to the retrieved context, or hallucinate
+6. **Contribution-guideline awareness** — if the repo has a CONTRIBUTING.md or similar docs, index those too so the agent can surface relevant conventions when a contributor asks how to add something
+
+Core use case: a contributor pastes a repo URL (and optionally a GitHub issue URL/description), and ContribLens tells them where the relevant code lives, what else touches it, and what they need to know before touching it — like a companion tool you open next to a GitHub issue.
+
+**Explicitly out of scope:** no git blame / commit history tracking.
+
+**Tech stack (100% free, no paid infrastructure required):**
+- Python, FastAPI (backend)
+- tree-sitter, with grammars for Python, JS/TS, Java, and C++ at minimum (extensible)
+- ChromaDB in embedded/local mode (vector store — free, no account, no server needed)
+- SQLite or local Postgres (for dependency-graph edges + metadata — free, no account needed)
+- **Groq API** (free tier) for LLM generation, re-ranking scores, query classification, and both LLM-as-judge passes — fast inference, generous free rate limits (~30 RPM, ~1,000 RPD depending on model); add retry/backoff logic
+- **Local embedding model via `sentence-transformers`** (e.g. a code-friendly model) run entirely on-device for embeddings — no API key or account needed, no rate limits
+- LangGraph (agentic retrieval orchestration — free, open-source)
+- LangSmith (tracing/eval logging — free tier)
+- GitHub API (repo cloning, issues, PRs — free, generous rate limits)
+- React/TypeScript frontend
+
+I want to build this in stages. Do not jump ahead — implement one stage, help me test it, then move to the next only when I confirm it's working. Ask me clarifying questions if a stage's requirements are ambiguous rather than assuming.
+
+---
+
+## Stage 0 — Setup (Day 1, ~2–3 hrs)
+
+- Set up the Python project (FastAPI backend)
+- Install ChromaDB (embedded mode) and confirm a local collection can be created, written to, and queried
+- Set up tree-sitter with grammars for at least Python and JS/TS to start (add more later)
+- Install a local `sentence-transformers` embedding model and confirm it can embed a sample chunk of code locally
+- Set up Groq API access and confirm a test generation call works; add basic exponential-backoff retry logic for rate limits
+- Set up LangSmith tracing (free tier) and confirm a test trace appears
+- Confirm: local ChromaDB read/write works, tree-sitter parses a sample file, local embedding model returns a vector, Groq responds to a test generation call
+
+## Stage 1 — Repo Ingestion Pipeline (Day 1–2, ~4–5 hrs)
+
+- Build a `POST /index-repo` endpoint that accepts a repo URL
+- Shallow-clone the repo, detect languages present by file extension, skip irrelevant files (binaries, lockfiles, `node_modules`, `.git`, etc.)
+- Create a dedicated ChromaDB collection per repo (so repos don't mix) — namespace it by repo identifier
+- If indexing takes a while, run it as a background task and expose a simple status check (e.g. `GET /index-status/{repo_id}`)
+- Confirm: point this at two different small-to-medium repos and verify both index successfully into separate collections
+
+## Stage 2 — AST-Aware Chunking (Day 2, ~4–6 hrs)
+
+- Walk each file's AST using the appropriate tree-sitter grammar for its language
+- Extract complete semantic units: functions, methods, classes (with docstrings/comments attached)
+- Store each chunk with metadata: file path, start/end line numbers, function/class name, parent class, language
+- Handle edge cases: nested functions, decorators, very long functions (keep as one chunk, don't split)
+- Confirm: inspect a sample of chunks across both test repos — every chunk should be syntactically complete and readable on its own
+
+## Stage 3 — Embedding + Hybrid Retrieval (Day 3, ~4–5 hrs)
+
+- Generate embeddings for each chunk via the local `sentence-transformers` model, store in the repo's ChromaDB collection alongside metadata
+- Implement BM25 over the same chunk set (e.g. via `rank_bm25`)
+- Implement Reciprocal Rank Fusion to merge vector search results and BM25 results into one ranked list
+- Confirm: run a conceptual query (should favor vector search) and an exact-identifier query (should favor BM25) against a test repo, verify hybrid ranking surfaces the right result in both cases
+
+## Stage 4 — Dependency Graph + "Blast Radius" Queries (Day 4–5, ~6–8 hrs)
+
+- Walk the AST of each file to extract function calls, imports, and class inheritance
+- Build a call graph / import graph (store as edges: `{caller, callee, file, line}`) in SQLite or local Postgres, namespaced per repo
+- Write graph traversal functions: "find all callers of X," "find all functions X calls," "find all files that import X" — this powers the core "blast radius" feature (what breaks if I change this)
+- Confirm: pick a known function in a test repo, manually verify the graph correctly identifies its real callers/callees
+
+## Stage 5 — Contribution-Guideline Awareness (Day 5, ~1–2 hrs)
+
+- If the repo has a CONTRIBUTING.md, code style guide, or PR template, chunk and index these too (treat as a separate small collection or tagged chunk type)
+- Confirm: ask a guideline-related question ("how do I add a new plugin") and verify the relevant doc content is retrieved
+
+## Stage 6 — Agentic Retrieval Loop (LangGraph) (Day 6–7, ~5–7 hrs)
+
+- Build a LangGraph graph with nodes for: query classification (conceptual / structural / guideline / mixed), semantic retrieval, graph retrieval, guideline retrieval, re-ranking, and final answer generation (using Groq for all LLM calls in the graph)
+- Route based on query intent (e.g. "what does X do" → semantic; "what calls X" / "what breaks if I change X" → graph; "how do I contribute Y" → guideline docs; ambiguous → multiple)
+- Add a loop-back edge: if the agent judges retrieved context insufficient, it can issue another retrieval call before answering
+- Wire up LangSmith tracing so every run is logged
+- Confirm: run 8–10 varied test queries (conceptual, structural/blast-radius, guideline, mixed) across both test repos and check the agent routes and retrieves sensibly
+
+## Stage 7 — Re-ranking (Day 7, ~2–3 hrs)
+
+- After hybrid retrieval, add a re-ranking step before final generation — a cheap Groq call scoring each candidate chunk's relevance to the query
+- Confirm: compare top-5 results before and after re-ranking on a few queries, check ordering improves
+
+## Stage 8 — Eval Pipeline via Issue/PR Mining + LLM-as-Judge (Day 8, ~4–5 hrs)
+
+- Build a script that pulls a repo's closed issues with a linked merged PR via the GitHub API
+- For each: use the issue title + description as the **query**, and the files/functions changed in the linked PR's diff as the **ground truth** (this stays purely PR-diff based — objective, not LLM-judged, since it's the most reliable ground truth available)
+- Use an LLM-as-judge (Groq) pass to filter the mined pairs: given the issue text + PR diff, judge whether it's specific and code-related enough to be a good eval query (yes/no + reason) — spot-check ~10–15% of these decisions by hand rather than reviewing all of them
+- Write scoring functions for Precision@k, Recall@k, and MRR
+- Run the filtered set through both vector-only retrieval and hybrid retrieval, log results with LangSmith, produce a comparison table
+- Add a second LLM-as-judge pass (Groq) scoring final-answer faithfulness/groundedness — does the generated answer actually stick to the retrieved context, or hallucinate beyond it
+- Confirm: retrieval numbers compute correctly; spot-check a handful of mined pairs and judge decisions by hand to sanity-check quality
+
+## Stage 9 — API + Frontend (Day 9–10, ~6–10 hrs)
+
+- FastAPI endpoints: index a repo, check indexing status, submit a query (optionally with a GitHub issue URL/description as input) → returns answer + cited source chunks (file + line numbers) + blast-radius info when relevant
+- Simple React/TypeScript UI: repo URL input, query/issue input, rendered answer, expandable citations showing exact retrieved code, and a simple visual list of affected callers/callees for blast-radius queries
+- Confirm: end-to-end flow works — index a new repo, ask both a conceptual and a structural question, get cited answers
+
+## Stage 10 — Polish for Resume/Demo (Day 10–11, ~3–5 hrs)
+
+- README explaining the problem (OSS contributor onboarding friction), architecture (hybrid retrieval + dependency graph + agentic routing), and how eval works (issue/PR-mined ground truth with LLM-as-judge filtering, not fully manual)
+- State clearly that the entire stack runs on free/open-source tools, no paid infrastructure
+- Record a short demo: index a real OSS repo live, ask a conceptual question, ask a blast-radius question, show cited answers
+- Write the final eval numbers into the README as a results table (vector-only vs hybrid)
+- Draft 2–3 resume bullets using the real numbers from Stage 8
+
+---
+
+## Instructions to Claude Code
+
+Work through Stage 0 first. After each stage, stop and let me test/review before continuing. Keep code modular so each component (ingestion, chunker, hybrid retriever, graph builder, LangGraph agent, eval harness) can be tested independently. Do not introduce any paid services or APIs beyond what's listed in the tech stack above — flag it and ask me first if a stage seems to require something outside the free tier.
