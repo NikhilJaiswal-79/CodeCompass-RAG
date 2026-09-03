@@ -12,8 +12,15 @@ def clone_repo(url: str, target_dir: str) -> bool:
         url = "https://" + url
 
     if os.path.exists(target_dir):
-        # If it exists, we could just clear it or pull, but let's do a fresh clone
-        shutil.rmtree(target_dir, ignore_errors=True)
+        # On Windows, .git folders have read-only files that shutil.rmtree cannot delete natively
+        import stat
+        def on_rm_error(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
+        shutil.rmtree(target_dir, onerror=on_rm_error)
     
     try:
         # --depth 1 for a shallow clone to save time and disk space

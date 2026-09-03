@@ -1,6 +1,7 @@
 import os
 import pickle
-from database import get_or_create_collection
+import numpy as np
+import faiss
 from embeddings import get_embedding
 
 def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybrid"):
@@ -11,41 +12,51 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
     # We fetch more than top_k for better fusion overlap and re-ranking
     fetch_k = 30
     
-    # 1. Vector Search (Dense)
-    collection = get_or_create_collection(repo_id)
-    query_embedding = get_embedding(query)
+    # Load chunks metadata immediately as both vector and BM25 need it
+    repos_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
+    chunks_path = os.path.join(repos_dir, f"{repo_id}_chunks.pkl")
+    faiss_path = os.path.join(repos_dir, f"{repo_id}_faiss.bin")
+    bm25_path = os.path.join(repos_dir, f"{repo_id}_bm25.pkl")
     
-    vector_results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=fetch_k
-    )
-    
+    chunk_metadatas = []
+    if os.path.exists(chunks_path):
+        with open(chunks_path, "rb") as f:
+            chunk_metadatas = pickle.load(f)
+            
+    # 1. Vector Search (Dense / FAISS)
     vector_hits = []
-    if vector_results['ids'] and len(vector_results['ids'][0]) > 0:
-        for i in range(len(vector_results['ids'][0])):
-            vector_hits.append({
-                "id": vector_results['ids'][0][i],
-                "content": vector_results['documents'][0][i],
-                "metadata": vector_results['metadatas'][0][i],
-                "score": vector_results['distances'][0][i]
-            })
+    if os.path.exists(faiss_path) and chunk_metadatas:
+        faiss_index = faiss.read_index(faiss_path)
+        query_embedding = get_embedding(query)
+        
+        # FAISS expects a 2D numpy array
+        query_np = np.array([query_embedding]).astype('float32')
+        
+        # search returns distances and indices
+        distances, indices = faiss_index.search(query_np, fetch_k)
+        
+        if len(indices) > 0 and len(indices[0]) > 0:
+            for i in range(len(indices[0])):
+                idx = indices[0][i]
+                if idx != -1 and idx < len(chunk_metadatas):  # Valid index
+                    meta = chunk_metadatas[idx]
+                    vector_hits.append({
+                        "id": f"chunk_{idx}",
+                        "content": meta.get("content", ""),
+                        "metadata": meta,
+                        "score": float(distances[0][i])
+                    })
             
     if mode == "vector_only":
         return vector_hits[:top_k]
             
     # 2. Keyword Search (Sparse / BM25)
     bm25_hits = []
-    repos_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
-    bm25_path = os.path.join(repos_dir, f"{repo_id}_bm25.pkl")
-    chunks_path = os.path.join(repos_dir, f"{repo_id}_chunks.pkl")
     
-    if os.path.exists(bm25_path) and os.path.exists(chunks_path):
+    if os.path.exists(bm25_path) and chunk_metadatas:
         from utils import tokenize_for_bm25
         with open(bm25_path, "rb") as f:
             bm25 = pickle.load(f)
-        with open(chunks_path, "rb") as f:
-            chunk_metadatas = pickle.load(f)
-            
         tokenized_query = tokenize_for_bm25(query)
         base_doc_scores = bm25.get_scores(tokenized_query)
         
@@ -86,20 +97,14 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
                 top_bm25_scores.append(score)
                 
         if top_bm25_ids:
-            bm25_content_results = collection.get(ids=top_bm25_ids)
-            content_map = {}
-            if bm25_content_results and bm25_content_results['ids']:
-                for i, doc_id in enumerate(bm25_content_results['ids']):
-                    content_map[doc_id] = bm25_content_results['documents'][i]
-            
             for i, doc_id in enumerate(top_bm25_ids):
+                meta = top_bm25_metas[i]
                 bm25_hits.append({
                     "id": doc_id,
-                    "content": content_map.get(doc_id, ""),
-                    "metadata": top_bm25_metas[i],
+                    "content": meta.get("content", ""),
+                    "metadata": meta,
                     "score": top_bm25_scores[i]
                 })
-                
     # 3. Reciprocal Rank Fusion (RRF)
     RRF_K = 60
     fused_scores = {}

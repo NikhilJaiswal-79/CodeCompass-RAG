@@ -8,3 +8,5 @@ safestep_test/
 safestep_test2/
 temp_clone_test/
 debug_out.txt
+temp_faiss_pkg/
+temp_lambda_pkg/

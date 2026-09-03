@@ -20,7 +20,10 @@ def extract_repo_id(url: str) -> str:
 def ingest_handler(repo_url):
     repo_id = extract_repo_id(repo_url)
     repo_path = os.path.join(os.path.dirname(__file__), "data", "repos", repo_id)
-    if os.path.exists(repo_path):
+    
+    # Bug Fix: Check if the final FAISS index actually exists, not just the cloned folder!
+    faiss_path = f"{repo_path}_faiss.bin"
+    if os.path.exists(faiss_path):
         yield "✅ Repository already ingested! You can start chatting."
         return
         
@@ -87,29 +90,90 @@ def chat_with_agent(message, history, repo_url):
     # 5. Return the generated answer
     yield final_state.get("final_answer", "Error: The agent could not generate an answer.")
 
+custom_css = """
+body, html {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+    color: #e2e8f0;
+    height: 100vh !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+}
+.gradio-container {
+    background: transparent !important;
+    border: none !important;
+    height: 100vh !important;
+    max-width: 100% !important;
+    padding: 10px 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+/* Allow only the chat area to scroll, not the whole page */
+.gr-box, .gr-panel, .gr-form {
+    background: rgba(30, 41, 59, 0.6) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+}
+/* Ensure the chatbot expands to fill the space */
+.wrap.svelte-1bup4q2 {
+    flex-grow: 1 !important;
+    overflow: hidden !important;
+}
+/* Premium Button */
+button.primary {
+    background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
+}
+button.primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.6) !important;
+}
+/* Gradient Text for Main Title */
+h1 {
+    background: -webkit-linear-gradient(45deg, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 900 !important;
+    letter-spacing: -0.5px;
+    margin: 0 !important;
+    padding-bottom: 5px !important;
+}
+/* Hide Gradio Footer Buttons */
+footer {
+    display: none !important;
+}
+"""
+
 # Build the Custom UI Layout
-with gr.Blocks(title="Universal GitHub Architecture Assistant", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Universal GitHub Architecture Assistant", css=custom_css, fill_height=True) as demo:
     gr.Markdown(
         """
-        # 🚀 Universal GitHub Architecture Assistant
+        # 🚀 CodeCompass Architecture Assistant
         Ask complex architectural questions about **ANY** GitHub codebase. The agent uses Tri-Modal Hybrid Retrieval (BM25 + Vector + Graph PageRank) to find the exact code chunks you need.
         """
     )
     
     with gr.Row():
-        # Left Sidebar (20% of screen) for Ingestion
+        # Left Sidebar (25% of screen) for Ingestion
         with gr.Column(scale=1):
             gr.Markdown("### 🛠️ Repository Ingestion")
             repo_input = gr.Textbox(
                 label="GitHub Repo URL", 
-                value="https://github.com/corsairdev/corsair", 
+                placeholder="https://github.com/username/repository",
                 info="Paste any public GitHub repository URL here to dynamically ingest and chat with it!"
             )
-            ingest_btn = gr.Button("Ingest Repository", variant="primary")
+            ingest_btn = gr.Button("Ingest Repository", variant="primary", size="lg")
             ingestion_status = gr.Textbox(label="Ingestion Progress", interactive=False, lines=6)
             
-        # Right Main Area (80% of screen) for Chatbot
-        with gr.Column(scale=4):
+        # Right Main Area (75% of screen) for Chatbot
+        with gr.Column(scale=3):
             chat_interface = gr.ChatInterface(
                 fn=chat_with_agent,
                 additional_inputs=[repo_input]
@@ -123,5 +187,4 @@ with gr.Blocks(title="Universal GitHub Architecture Assistant", theme=gr.themes.
     )
 
 if __name__ == "__main__":
-    # Launching on 0.0.0.0 is required for Hugging Face Spaces!
     demo.launch(server_name="0.0.0.0", server_port=7860)
