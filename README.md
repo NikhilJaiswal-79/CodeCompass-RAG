@@ -1,5 +1,7 @@
 # 🔍 CodeCompass (ContribLens): Cloud-Native Codebase RAG Engine
 
+**Live Application:** [https://code-compass.app](https://code-compass.app)
+
 CodeCompass is a state-of-the-art **Tri-Modal Retrieval-Augmented Generation (RAG) Engine** designed to instantly index, comprehend, and navigate massive, unfamiliar codebases. 
 
 Unlike traditional RAG systems that blindly chop text into chunks, CodeCompass uses Abstract Syntax Trees (AST) and Graph Mathematics to truly understand the structural logic of code, acting as an AI Senior Developer that can answer complex architectural questions. It is fully modernized and deployed as a highly scalable **Serverless AWS Cloud Architecture**.
@@ -19,7 +21,7 @@ CodeCompass abandons standard vector-only search for a hyper-accurate Tri-Modal 
 Instead of arbitrary character-count chunking, it uses Tree-sitter bindings across 15+ languages to surgically extract perfect, logical functions and classes. 
 
 ### 3. Agentic State Machine (LangGraph)
-Powered by **Google Gemini** (or Claude API), the reasoning engine is a true autonomous Agent. When asked a complex question, the Agent:
+Powered by **Claude 3.5 Haiku**, the reasoning engine is a true autonomous Agent. When asked a complex question, the Agent:
 1. Plans multiple sub-queries.
 2. Generates Hypothetical Code (HyDE) to improve vector matching.
 3. Automatically compresses noisy context.
@@ -46,11 +48,9 @@ Features a gorgeous, responsive UI built in vanilla HTML/CSS/JS that communicate
 You can simply double-click `frontend/index.html` to open the web app in your browser locally!
 
 ### 2. AWS Cloud Deployment
-All backend logic is fully deployed on AWS Lambda. 
-If you wish to deploy the frontend to the public internet as well:
-1. Create an S3 Bucket and enable **Static Website Hosting**.
-2. Upload the `index.html`, `app.js`, and `style.css` files.
-3. Deploy an **Amazon CloudFront** distribution in front of the bucket.
-4. Link it to your custom domain via **Route 53**.
+This application is fully deployed and hosted in the AWS Cloud:
+1. **Backend:** All RAG pipeline microservices and conversational agents are running on highly scalable **AWS Lambda** functions behind an **API Gateway**.
+2. **Frontend:** The web application is hosted via an **S3 Bucket** with Static Website Hosting enabled.
+3. **CDN & DNS:** The frontend is globally accelerated by an **Amazon CloudFront** distribution and routed through **Route 53** to the custom domain (code-compass.app).
 
-*Built with LangGraph, FAISS, Google Gemini, and AWS Lambda.*
+*Built with LangGraph, FAISS, Google Gemini, Anthropic Claude, and AWS Lambda.*
