@@ -40,25 +40,27 @@ def lambda_handler(event, context):
             }
             
         repo_id = extract_repo_id(repo_url)
+        force_reindex = body.get('force_reindex', False)
         
         # 1. Check if already indexed (Cache Check)
         table = dynamodb.Table(TABLE_NAME)
-        try:
-            response = table.get_item(Key={'repo_id': repo_id})
-            if 'Item' in response and response['Item'].get('status') == 'completed':
-                return {
-                    "statusCode": 200,
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*"
-                    },
-                    "body": json.dumps({
-                        "message": "Already indexed. Skipping background ingestion.",
-                        "repo_id": repo_id
-                    })
-                }
-        except Exception as e:
-            print(f"Warning: Cache check failed: {e}")
+        if not force_reindex:
+            try:
+                response = table.get_item(Key={'repo_id': repo_id})
+                if 'Item' in response and response['Item'].get('status') == 'completed':
+                    return {
+                        "statusCode": 200,
+                        "headers": {
+                            "Content-Type": "application/json",
+                            "Access-Control-Allow-Origin": "*"
+                        },
+                        "body": json.dumps({
+                            "message": "Already indexed. Skipping background ingestion.",
+                            "repo_id": repo_id
+                        })
+                    }
+            except Exception as e:
+                print(f"Warning: Cache check failed: {e}")
             
         # 2. Write the initial state to DynamoDB
         table.put_item(

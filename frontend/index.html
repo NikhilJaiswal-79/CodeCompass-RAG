@@ -26,6 +26,10 @@
                     <input type="text" id="repo-url-input" placeholder="https://github.com/owner/repo" />
                     <button id="ingest-btn">Index Repo</button>
                 </div>
+                <div class="checkbox-group" style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="force-reindex-checkbox" />
+                    <label for="force-reindex-checkbox" style="font-size: 0.85rem; color: #a1a1aa; cursor: pointer;">Force Re-Index (ignore cache)</label>
+                </div>
                 <div id="status-display" class="status-box hidden">
                     <div class="status-indicator"></div>
                     <span id="status-text">Pending...</span>

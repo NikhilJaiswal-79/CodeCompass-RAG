@@ -50,11 +50,13 @@ ingestBtn.addEventListener('click', async () => {
     statusIndicator.className = 'status-indicator pulsing';
     statusText.textContent = 'Starting pipeline...';
     
+    const forceReindex = document.getElementById('force-reindex-checkbox').checked;
+    
     try {
         const res = await fetch(`${API_BASE}/ingest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ repo_url: url })
+            body: JSON.stringify({ repo_url: url, force_reindex: forceReindex })
         });
         
         const data = await res.json();
