@@ -14,7 +14,7 @@ Unlike traditional RAG systems that blindly chop text into chunks, CodeCompass u
 CodeCompass abandons standard vector-only search for a hyper-accurate Tri-Modal approach:
 * **Dense Vectors (FAISS):** Semantic conceptual matching.
 * **Sparse Keywords (BM25):** Ensures exact variable and function names are never lost.
-* **Graph Centrality (PageRank):** Calculates the PageRank of the SQLite dependency graph to artificially boost structurally critical "God classes" in the search results.
+* **Graph Centrality (PageRank):** Maps out function calls and imports to find the most heavily relied-upon code in the repository. It uses Google's PageRank algorithm to guarantee that core architectural files are boosted to the top of your search results, rather than unimportant helper scripts.
 * All three signals are fused together mathematically using **Reciprocal Rank Fusion (RRF)**.
 
 ### 2. AST-Aware Ingestion (Tree-sitter)
