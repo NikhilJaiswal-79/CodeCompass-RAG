@@ -15,7 +15,7 @@ CodeCompass abandons standard vector-only search for a hyper-accurate Tri-Modal 
 * **Dense Vectors (FAISS):** Semantic conceptual matching.
 * **Sparse Keywords (BM25):** Ensures exact variable and function names are never lost.
 * **Graph Centrality (PageRank):** Maps out function calls and imports to find the most heavily relied-upon code in the repository. It uses Google's PageRank algorithm to guarantee that core architectural files are boosted to the top of your search results, rather than unimportant helper scripts.
-* All three signals are fused together mathematically using **Reciprocal Rank Fusion (RRF)**.
+* **Reciprocal Rank Fusion (RRF):** A mathematical algorithm that merges the results from the Dense Vectors, Sparse Keywords, and PageRank. Instead of relying on raw scores (which are impossible to directly compare), RRF looks at the *ranking position* of a file in each list and combines them. This ensures that a file performing strongly across all three metrics beats a file that only spiked in one.
 
 ### 2. AST-Aware Ingestion (Tree-sitter)
 Instead of arbitrary character-count chunking, it uses Tree-sitter bindings across 15+ languages to surgically extract perfect, logical functions and classes. 
