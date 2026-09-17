@@ -13,7 +13,7 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
     fetch_k = 30
     
     # Load chunks metadata immediately as both vector and BM25 need it
-    repos_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
+    repos_dir = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data", "repos"))
     chunks_path = os.path.join(repos_dir, f"{repo_id}_chunks.pkl")
     faiss_path = os.path.join(repos_dir, f"{repo_id}_faiss.bin")
     bm25_path = os.path.join(repos_dir, f"{repo_id}_bm25.pkl")
@@ -42,8 +42,8 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
                     meta = chunk_metadatas[idx]
                     vector_hits.append({
                         "id": f"chunk_{idx}",
-                        "content": meta.get("content", ""),
-                        "metadata": meta,
+                        "content": meta.content,
+                        "metadata": meta.model_dump(),
                         "score": float(distances[0][i])
                     })
             
@@ -79,7 +79,7 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
         doc_scores = []
         for idx, score in enumerate(base_doc_scores):
             meta = chunk_metadatas[idx]
-            name = meta.get("name")
+            name = meta.name
             pr_score = pagerank_map.get(name, 0.15) if name else 0.15
             # Boost keyword score by graph centrality (e.g. 5x multiplier for high PR)
             boosted_score = score * (1.0 + (pr_score * 5.0))
@@ -101,8 +101,8 @@ def retrieve_hybrid(repo_id: str, query: str, top_k: int = 10, mode: str = "hybr
                 meta = top_bm25_metas[i]
                 bm25_hits.append({
                     "id": doc_id,
-                    "content": meta.get("content", ""),
-                    "metadata": meta,
+                    "content": meta.content,
+                    "metadata": meta.model_dump(),
                     "score": top_bm25_scores[i]
                 })
     # 3. Reciprocal Rank Fusion (RRF)

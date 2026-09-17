@@ -113,9 +113,31 @@ def calculate_pagerank(conn):
     if len(G.nodes) == 0:
         return
         
-    # 2. Run PageRank
+    # 2. Run PageRank (Pure Python to avoid scipy dependency)
     try:
-        pagerank_scores = nx.pagerank(G, alpha=0.85)
+        alpha = 0.85
+        max_iter = 50
+        tol = 1.0e-6
+        N = len(G.nodes)
+        
+        pagerank_scores = {node: 1.0 / N for node in G.nodes}
+        out_degree = {node: G.out_degree(node) for node in G.nodes}
+        predecessors = {node: list(G.predecessors(node)) for node in G.nodes}
+        dangling_nodes = [node for node in G.nodes if out_degree[node] == 0]
+        
+        for _ in range(max_iter):
+            prev_scores = pagerank_scores
+            pagerank_scores = {}
+            dangling_sum = sum(prev_scores[node] for node in dangling_nodes)
+            
+            for node in G.nodes:
+                score = sum(prev_scores[pred] / out_degree[pred] for pred in predecessors[node])
+                score = alpha * (score + dangling_sum / N) + (1.0 - alpha) / N
+                pagerank_scores[node] = score
+                
+            err = sum(abs(pagerank_scores[n] - prev_scores[n]) for n in G.nodes)
+            if err < N * tol:
+                break
     except Exception as e:
         print(f"PageRank calculation failed: {e}")
         return

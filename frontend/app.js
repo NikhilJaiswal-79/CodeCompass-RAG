@@ -1,5 +1,6 @@
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'https://ngi7d95uh8.execute-api.eu-north-1.amazonaws.com';
 let currentRepoId = null;
+let currentRepoUrl = null;
 let indexingInterval = null;
 
 const ingestBtn = document.getElementById('ingest-btn');
@@ -50,18 +51,19 @@ ingestBtn.addEventListener('click', async () => {
     statusText.textContent = 'Starting pipeline...';
     
     try {
-        const res = await fetch(`${API_BASE}/index-repo`, {
+        const res = await fetch(`${API_BASE}/ingest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ repo_url: url })
         });
         
         const data = await res.json();
         if (res.ok) {
             currentRepoId = data.repo_id;
+            currentRepoUrl = url;
             pollStatus(currentRepoId);
         } else {
-            throw new Error(data.detail || 'Failed to start index');
+            throw new Error(data.detail || data.error || 'Failed to start index');
         }
     } catch (e) {
         statusIndicator.className = 'status-indicator error';
@@ -76,13 +78,13 @@ function pollStatus(repoId) {
     
     indexingInterval = setInterval(async () => {
         try {
-            const res = await fetch(`${API_BASE}/index-status/${repoId}`);
+            const res = await fetch(`${API_BASE}/status?repo=${repoId}`);
             const data = await res.json();
             
             if (data.status === 'completed') {
                 clearInterval(indexingInterval);
                 statusIndicator.className = 'status-indicator success';
-                statusText.textContent = `Indexed ${data.files_discovered} files / ${data.chunks_extracted} chunks.`;
+                statusText.textContent = `Indexed successfully!`;
                 
                 repoBadge.textContent = repoId;
                 chatInput.disabled = false;
@@ -129,57 +131,37 @@ chatForm.addEventListener('submit', async (e) => {
     sendBtn.disabled = true;
     
     try {
-        const res = await fetch(`${API_BASE}/chat/stream/${currentRepoId}`, {
+        const res = await fetch(`${API_BASE}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
+            body: JSON.stringify({ 
+                repo_url: currentRepoUrl,
+                message: query,
+                history: []
+            })
         });
         
-        if (!res.ok) {
-            const err = await res.json();
+        const data = await res.json();
+        
+        if (document.getElementById(loadingId)) {
             document.getElementById(loadingId).remove();
-            appendMessage('system', `Error: ${err.detail}`);
-            throw new Error("Stream failed");
         }
         
-        const loadingContent = document.querySelector(`#${loadingId} .message-content`);
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value, {stream: true});
-            const lines = chunk.split('\n');
-            
-            for (let line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataStr = line.substring(6).trim();
-                    if (!dataStr) continue;
-                    
-                    try {
-                        const data = JSON.parse(dataStr);
-                        if (data.node) {
-                            // Update the loading message text dynamically
-                            let friendlyNode = data.node.replace(/_/g, ' ');
-                            loadingContent.innerHTML = `<em>Agent is working: <strong>${friendlyNode}</strong>...</em>`;
-                        } else if (data.answer) {
-                            // Graph finished, remove loading and show answer
-                            document.getElementById(loadingId).remove();
-                            appendMessage('agent', data.answer);
-                        } else if (data.error) {
-                            document.getElementById(loadingId).remove();
-                            appendMessage('system', `Agent Error: ${data.error}`);
-                        }
-                    } catch(err) {
-                        console.error("Failed to parse SSE chunk:", err);
-                    }
-                }
-            }
+        if (!res.ok) {
+            appendMessage('system', `Error: ${data.error || data.detail || 'Failed to get answer'}`);
+            throw new Error("Chat request failed");
         }
+        
+        if (data.response) {
+            appendMessage('agent', data.response);
+        } else {
+            appendMessage('system', `Agent Error: Unexpected response format.`);
+        }
+        
     } catch (e) {
-        document.getElementById(loadingId).remove();
+        if(document.getElementById(loadingId)) {
+            document.getElementById(loadingId).remove();
+        }
         appendMessage('system', `Connection Error: ${e.message}`);
     } finally {
         chatInput.disabled = false;

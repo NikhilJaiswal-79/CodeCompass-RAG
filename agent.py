@@ -6,21 +6,32 @@ from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 from retrieval import retrieve_hybrid
 from graph_queries import get_callers, get_callees
-from utils import get_gemini_client
-from google.genai import types
+from utils import get_bedrock_client
 import time
+
+class DummyResponse:
+    def __init__(self, text):
+        self.text = text
 
 def generate_with_retry(client, model, contents, config=None):
     for i in range(5):
         try:
-            return client.models.generate_content(model=model, contents=contents, config=config)
+            # Format the prompt for Bedrock Converse API
+            messages = [{"role": "user", "content": [{"text": contents}]}]
+            
+            response = client.converse(
+                modelId=model,
+                messages=messages
+            )
+            text_output = response['output']['message']['content'][0]['text']
+            
+
+                    
+            return DummyResponse(text_output)
         except Exception as e:
             if i == 4: raise e
-            print(f"Gemini API limit/error hit. Fetching new key and retrying in 5s... ({e})")
+            print(f"Bedrock API error hit. Retrying in 5s... ({e})")
             time.sleep(5)
-            # Fetch a new random client to rotate the API key
-            from utils import get_gemini_client
-            client = get_gemini_client()
 
 load_dotenv()
 
@@ -38,13 +49,13 @@ class AgentState(TypedDict):
     next_action: str
     retrieval_mode: str
 
-MODEL_NAME = "gemini-3.1-flash-lite"
-FAST_MODEL = "gemini-3.1-flash-lite"
+MODEL_NAME = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+FAST_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 def plan_queries(state: AgentState):
     print("--- [Agent] Planning Queries ---")
     try:
-        client = get_gemini_client()
+        client = get_bedrock_client()
     except Exception:
         return {"sub_queries": [state["query"]], "graph_targets": [], "hypothetical_code": ""}
     
@@ -70,11 +81,25 @@ def plan_queries(state: AgentState):
             client=client,
             model=MODEL_NAME,
             contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config={"response_mime_type": "application/json"}
         )
-        data = json.loads(response.text)
+        raw = response.text
+        start, end = raw.find('{'), raw.rfind('}')
+        
+        data = None
+        if start != -1 and end != -1:
+            try:
+                data = json.loads(raw[start:end+1], strict=False)
+            except json.JSONDecodeError:
+                pass
+                
+        if data is None:
+            try:
+                data = json.loads(raw, strict=False)
+            except json.JSONDecodeError:
+                data = {"search_queries": [state["query"]], "graph_targets": [], "hypothetical_code": ""}
     except Exception as e:
-        print(f"Error calling Gemini in plan_queries: {e}")
+        print(f"Error calling Bedrock in plan_queries: {e}")
         return {"sub_queries": [state["query"]], "graph_targets": [], "hypothetical_code": ""}
     
     # Merge seeded targets with newly extracted ones
@@ -133,7 +158,8 @@ def execute_search(state: AgentState):
                 
     rules = state.get("rules", {})
     if not rules:
-        repos_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
+        repo_id = state["repo_id"]
+        repos_dir = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data", "repos"))
         rules_path = os.path.join(repos_dir, f"{repo_id}_rules.json")
         if os.path.exists(rules_path):
             with open(rules_path, "r") as f:
@@ -149,7 +175,7 @@ def execute_search(state: AgentState):
 def compress_context(state: AgentState):
     print("--- [Agent] Compressing Context ---")
     try:
-        client = get_gemini_client()
+        client = get_bedrock_client()
     except Exception:
         return {}
     
@@ -171,7 +197,7 @@ def compress_context(state: AgentState):
 def generate_or_replan(state: AgentState):
     print("--- [Agent] Reviewing Context & Generating ---")
     try:
-        client = get_gemini_client()
+        client = get_bedrock_client()
     except Exception:
         return {"next_action": "end", "final_answer": "Error initializing Gemini."}
     
@@ -214,6 +240,9 @@ def generate_or_replan(state: AgentState):
     If the context contains enough information to accurately answer the user's question, output a final markdown answer.
     If the context is entirely missing the required files or logic, you may request a new search by providing a new search query.
     
+    CRITICAL: You must output perfectly valid JSON. Do not use unescaped quotes or newlines in the JSON string values.
+
+    
     Output ONLY a JSON object in this exact format:
     {{
        "action": "answer",
@@ -231,12 +260,27 @@ def generate_or_replan(state: AgentState):
             client=client,
             model=MODEL_NAME,
             contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config={"response_mime_type": "application/json"}
         )
-        data = json.loads(response.text)
+        raw = response.text
+        start, end = raw.find('{'), raw.rfind('}')
+        
+        data = None
+        if start != -1 and end != -1:
+            try:
+                data = json.loads(raw[start:end+1], strict=False)
+            except json.JSONDecodeError:
+                pass
+                
+        if data is None:
+            try:
+                data = json.loads(raw, strict=False)
+            except json.JSONDecodeError:
+                # If Claude completely failed to output JSON, assume it just returned the raw Markdown answer!
+                data = {"action": "answer", "text": raw}
     except Exception as e:
         print(f"Error in generate_or_replan: {e}")
-        return {"next_action": "end", "final_answer": "Error generating response."}
+        return {"next_action": "end", "final_answer": f"Error generating response. Parser crashed on this raw output from Claude: {raw!r}"}
         
     action = data.get("action", "answer")
     iterations = state.get("iterations", 0)

@@ -6,7 +6,7 @@ def get_graph_db_connection(repo_id: str):
     Returns a connection to the SQLite graph database for a specific repository.
     Creates the database and schema if it doesn't exist.
     """
-    repos_dir = os.path.join(os.path.dirname(__file__), "data", "repos")
+    repos_dir = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data", "repos"))
     os.makedirs(repos_dir, exist_ok=True)
     
     db_path = os.path.join(repos_dir, f"{repo_id}_graph.db")

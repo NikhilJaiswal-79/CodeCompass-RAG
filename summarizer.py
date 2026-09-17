@@ -1,18 +1,18 @@
 import os
 from dotenv import load_dotenv
 import time
-from utils import get_gemini_client
+from utils import get_bedrock_client
 
 load_dotenv()
 
-FAST_MODEL_NAME = "gemini-3.1-flash-lite"
+FAST_MODEL_NAME = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 def generate_file_summary(file_path: str, file_content: str) -> str:
     """
     Generates a 1-sentence summary of the file's purpose to enrich chunk context.
     """
     try:
-        client = get_gemini_client()
+        client = get_bedrock_client()
     except Exception:
         return ""
         
@@ -30,11 +30,12 @@ def generate_file_summary(file_path: str, file_content: str) -> str:
     
     try:
         time.sleep(1)
-        response = client.models.generate_content(
-            model=FAST_MODEL_NAME,
-            contents=prompt
+        messages = [{"role": "user", "content": [{"text": prompt}]}]
+        response = client.converse(
+            modelId=FAST_MODEL_NAME,
+            messages=messages
         )
-        return response.text.strip()
+        return response['output']['message']['content'][0]['text'].strip()
     except Exception as e:
         print(f"Warning: Failed to generate file summary for {file_path}: {e}")
         return ""

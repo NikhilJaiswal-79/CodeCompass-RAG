@@ -10,3 +10,11 @@ temp_clone_test/
 debug_out.txt
 temp_faiss_pkg/
 temp_lambda_pkg/
+deployment_package_windows.zip
+source_code.zip
+temp_size_check/
+aws_lambda_pkg/
+payload.json
+response.json
+test_json.py
+.agents/

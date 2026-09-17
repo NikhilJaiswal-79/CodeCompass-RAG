@@ -3,13 +3,18 @@ import subprocess
 import shutil
 import re
 import random
+import urllib.request
+import zipfile
+
 def clone_repo(url: str, target_dir: str) -> bool:
     """
-    Shallow-clones a git repository to the target directory.
+    Downloads a git repository as a ZIP file to bypass the missing git binary in AWS Lambda.
     Returns True if successful, False otherwise.
     """
     if not url.startswith("http://") and not url.startswith("https://"):
         url = "https://" + url
+        
+    url = url.rstrip('/')
 
     if os.path.exists(target_dir):
         # On Windows, .git folders have read-only files that shutil.rmtree cannot delete natively
@@ -23,16 +28,35 @@ def clone_repo(url: str, target_dir: str) -> bool:
         shutil.rmtree(target_dir, onerror=on_rm_error)
     
     try:
-        # --depth 1 for a shallow clone to save time and disk space
-        subprocess.run(
-            ["git", "clone", "--depth", "1", url, target_dir],
-            check=True,
-            capture_output=True,
-            text=True
-        )
+        zip_url_main = f"{url}/archive/refs/heads/main.zip"
+        zip_url_master = f"{url}/archive/refs/heads/master.zip"
+        
+        zip_path = target_dir + "_temp.zip"
+        
+        try:
+            urllib.request.urlretrieve(zip_url_main, zip_path)
+        except Exception:
+            # Fallback to master branch if main doesn't exist
+            urllib.request.urlretrieve(zip_url_master, zip_path)
+            
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(target_dir)
+            
+        os.remove(zip_path)
+        
+        # GitHub zips extract into a subfolder (e.g., RepoName-main). Move contents up one level.
+        extracted_dirs = os.listdir(target_dir)
+        if len(extracted_dirs) == 1 and os.path.isdir(os.path.join(target_dir, extracted_dirs[0])):
+            subfolder = os.path.join(target_dir, extracted_dirs[0])
+            for item in os.listdir(subfolder):
+                shutil.move(os.path.join(subfolder, item), target_dir)
+            os.rmdir(subfolder)
+            
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error cloning repo {url}: {e.stderr}")
+    except Exception as e:
+        print(f"Error downloading repo {url}: {e}")
+        if os.path.exists(target_dir + "_temp.zip"):
+            os.remove(target_dir + "_temp.zip")
         return False
 
 def get_files_to_index(repo_dir: str) -> list[str]:
@@ -100,3 +124,11 @@ def get_gemini_client():
     _current_key_idx += 1
     
     return genai.Client(api_key=selected_key)
+
+def get_bedrock_client():
+    """
+    Returns a configured boto3 Bedrock Runtime client.
+    Because this runs on AWS Lambda, it automatically inherits the IAM role credentials.
+    """
+    import boto3
+    return boto3.client("bedrock-runtime", region_name="us-east-1")
