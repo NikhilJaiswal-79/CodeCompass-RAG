@@ -16,14 +16,23 @@ dynamodb = boto3.resource('dynamodb')
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "IngestionStatus")
 
-def update_status(repo_id: str, status: str, error: str = None):
+def update_status(repo_id: str, status: str, error: str = None, commit_sha: str = None):
     try:
         table = dynamodb.Table(TABLE_NAME)
+        update_expr = "SET #s = :status, #e = :error"
+        attr_names = {'#s': 'status', '#e': 'error'}
+        attr_values = {':status': status, ':error': error}
+        
+        if commit_sha:
+            update_expr += ", #c = :commit_sha"
+            attr_names['#c'] = 'commit_sha'
+            attr_values[':commit_sha'] = commit_sha
+            
         table.update_item(
             Key={'repo_id': repo_id},
-            UpdateExpression="SET #s = :status, #e = :error",
-            ExpressionAttributeNames={'#s': 'status', '#e': 'error'},
-            ExpressionAttributeValues={':status': status, ':error': error}
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=attr_names,
+            ExpressionAttributeValues=attr_values
         )
     except Exception as e:
         print(f"Failed to update DynamoDB: {e}")
@@ -44,6 +53,7 @@ def lambda_handler(event, context):
     """
     repo_url = event.get('repo_url')
     repo_id = event.get('repo_id')
+    commit_sha = event.get('commit_sha')
     
     if not repo_url or not repo_id:
         print("Error: Missing repo_url or repo_id in event payload.")
@@ -125,7 +135,7 @@ def lambda_handler(event, context):
                 os.remove(f)
         
         # Complete
-        update_status(repo_id, "completed")
+        update_status(repo_id, "completed", error=None, commit_sha=commit_sha)
         print(f"Ingestion perfectly complete for {repo_id}")
         
     except Exception as e:
