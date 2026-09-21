@@ -30,10 +30,12 @@ Powered by **Claude 3.5 Haiku**, the reasoning engine is a true autonomous Agent
 
 ### 4. 100% Serverless AWS Architecture
 The backend is completely decoupled into a highly scalable cloud pipeline:
-- **AWS API Gateway:** Securely routes all incoming traffic.
+- **Amazon Route 53 & CloudFront:** Manages the custom domain (`code-compass.app`) and globally distributes the frontend UI via a lightning-fast CDN with SSL encryption.
+- **AWS API Gateway:** Securely routes all incoming backend traffic.
 - **Amazon DynamoDB:** Manages the state and progress of the repository ingestion, featuring **Smart Cache Checks** to prevent redundant indexing.
 - **AWS Lambda (Dispatcher):** Instantly acknowledges requests and asynchronously triggers background tasks (Supports Force Re-Indexing).
 - **AWS Lambda (Heavy Worker):** Dynamically allocates up to 15 minutes of compute to clone, chunk, and index massive repositories in the background.
+- **AWS Lambda (Status):** A lightweight polling endpoint that continuously checks DynamoDB to update the frontend UI on ingestion progress.
 - **AWS Lambda (Chat):** Streams the LangGraph reasoning engine responses back to the frontend.
 - **Amazon S3:** Persistently stores the massive FAISS, BM25, and Graph SQLite databases for instantaneous retrieval.
 
