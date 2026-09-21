@@ -4,6 +4,7 @@ let currentRepoUrl = null;
 let indexingInterval = null;
 
 const ingestBtn = document.getElementById('ingest-btn');
+const forceReindexBtn = document.getElementById('force-reindex-btn');
 const urlInput = document.getElementById('repo-url-input');
 const statusBox = document.getElementById('status-display');
 const statusText = document.getElementById('status-text');
@@ -40,17 +41,16 @@ function appendMessage(role, content) {
 }
 
 // Handle Ingestion
-ingestBtn.addEventListener('click', async () => {
+async function startIngestion(forceReindex = false) {
     const url = urlInput.value.trim();
     if (!url) return;
     
     ingestBtn.disabled = true;
+    if (forceReindexBtn) forceReindexBtn.disabled = true;
     urlInput.disabled = true;
     statusBox.classList.remove('hidden');
     statusIndicator.className = 'status-indicator pulsing';
-    statusText.textContent = 'Starting pipeline...';
-    
-    const forceReindex = document.getElementById('force-reindex-checkbox').checked;
+    statusText.textContent = forceReindex ? 'Forcing re-index...' : 'Starting pipeline...';
     
     try {
         const res = await fetch(`${API_BASE}/ingest`, {
@@ -71,9 +71,15 @@ ingestBtn.addEventListener('click', async () => {
         statusIndicator.className = 'status-indicator error';
         statusText.textContent = `Error: ${e.message}`;
         ingestBtn.disabled = false;
+        if (forceReindexBtn) forceReindexBtn.disabled = false;
         urlInput.disabled = false;
     }
-});
+}
+
+ingestBtn.addEventListener('click', () => startIngestion(false));
+if (forceReindexBtn) {
+    forceReindexBtn.addEventListener('click', () => startIngestion(true));
+}
 
 function pollStatus(repoId) {
     if (indexingInterval) clearInterval(indexingInterval);
@@ -95,12 +101,14 @@ function pollStatus(repoId) {
                 appendMessage('system', 'Repository successfully indexed. You can now chat with the agent.');
                 
                 ingestBtn.disabled = false;
+                if (forceReindexBtn) forceReindexBtn.disabled = false;
                 urlInput.disabled = false;
             } else if (data.status === 'failed') {
                 clearInterval(indexingInterval);
                 statusIndicator.className = 'status-indicator error';
                 statusText.textContent = `Failed: ${data.error}`;
                 ingestBtn.disabled = false;
+                if (forceReindexBtn) forceReindexBtn.disabled = false;
                 urlInput.disabled = false;
             } else {
                 statusText.textContent = `Status: ${data.status}...`;

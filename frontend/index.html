@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ContribLens - Agentic Code Search</title>
+    <title>Code Compass - Agentic Code Search</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
         <aside class="sidebar">
             <div class="logo">
                 <span class="icon">🔍</span>
-                <h1>ContribLens</h1>
+                <h1>Code Compass</h1>
             </div>
             
             <div class="ingest-section">
@@ -26,9 +26,8 @@
                     <input type="text" id="repo-url-input" placeholder="https://github.com/owner/repo" />
                     <button id="ingest-btn">Index Repo</button>
                 </div>
-                <div class="checkbox-group" style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
-                    <input type="checkbox" id="force-reindex-checkbox" />
-                    <label for="force-reindex-checkbox" style="font-size: 0.85rem; color: #a1a1aa; cursor: pointer;">Force Re-Index (ignore cache)</label>
+                <div class="action-buttons" style="margin-top: 10px; display: flex; gap: 8px;">
+                    <button id="force-reindex-btn" style="flex: 1; padding: 0.5rem; background-color: transparent; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Force Re-Index</button>
                 </div>
                 <div id="status-display" class="status-box hidden">
                     <div class="status-indicator"></div>
@@ -52,7 +51,7 @@
             <div class="chat-history" id="chat-history">
                 <div class="message system-message">
                     <div class="message-content">
-                        Welcome to ContribLens! Please index a repository in the sidebar to get started.
+                        Welcome to Code Compass! Please index a repository in the sidebar to get started.
                     </div>
                 </div>
             </div>

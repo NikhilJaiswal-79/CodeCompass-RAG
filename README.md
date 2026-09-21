@@ -41,6 +41,26 @@ The backend is completely decoupled into a highly scalable cloud pipeline:
 
 ### 5. Premium Glassmorphic UI
 Features a gorgeous, responsive UI built in vanilla HTML/CSS/JS that communicates directly with the cloud APIs, offering real-time streaming, smart caching, and force re-indexing controls.
+### 6. Tech Stack & Libraries
+**Frontend:**
+- Vanilla HTML5 / CSS3 / JavaScript
+- `marked.js`: Client-side markdown rendering.
+- Amazon CloudFront & Route 53 (Hosting & DNS)
+
+**Backend Infrastructure:**
+- AWS Lambda (Serverless Compute)
+- AWS API Gateway (Routing)
+- Amazon DynamoDB (State Cache)
+- Amazon S3 (Database Storage)
+
+**Core RAG Engine (Python):**
+- `langgraph`: Agentic state machine and reasoning loops.
+- `anthropic` (Claude 3.5 Haiku): Core LLM for reasoning and generation.
+- `faiss-cpu`: High-dimensional vector similarity search.
+- `networkx`: PageRank algorithm and graph centrality processing.
+- `google-genai` (Gemini): Generation of 768-dimensional text embeddings.
+- `tree-sitter` & `tree_sitter_languages`: Abstract Syntax Tree (AST) parsing.
+- `rank_bm25`: TF-IDF exact keyword matching engine.
 
 ---
 

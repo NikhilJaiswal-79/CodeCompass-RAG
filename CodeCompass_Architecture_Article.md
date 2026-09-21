@@ -15,6 +15,24 @@ Traditional RAG systems try to build this "search engine" by blindly chopping te
 
 To truly understand an unfamiliar codebase, you need an architecture that understands concepts, precise variable names, and architectural dependencies simultaneously. Here is an in-depth breakdown of how the **CodeCompass Tri-Modal RAG Engine** processes and comprehends code behind the scenes to solve this massive problem.
 
+### The Tech Stack & Python Libraries
+Before diving into the architecture, here is the exact technology stack that powers CodeCompass:
+
+**Core RAG Engine (Python):**
+*   **`langgraph`:** Manages the agentic state machine and autonomous reasoning loops.
+*   **`anthropic` (Claude 3.5 Haiku):** The core LLM powering the reasoning engine.
+*   **`faiss-cpu`:** Handles the high-dimensional vector similarity search.
+*   **`networkx`:** Constructs the dependency graph and executes the PageRank algorithm.
+*   **`google-genai` (Gemini):** Generates the 768-dimensional text embeddings.
+*   **`tree-sitter` & `tree_sitter_languages`:** Provides the Abstract Syntax Tree (AST) parsing for over 15 languages.
+*   **`rank_bm25`:** Powers the TF-IDF exact keyword matching engine.
+
+**Cloud Infrastructure & Frontend:**
+*   **AWS:** 100% Serverless backend using Lambda, API Gateway, DynamoDB, and S3.
+*   **Frontend:** Vanilla HTML/CSS/JS with `marked.js`, hosted on Amazon CloudFront (CDN) & Route 53 (DNS).
+
+---
+
 ### The Evolution: From Vector-Only to Tri-Modal Hybrid
 When building CodeCompass, I didn't start with this complex Tri-Modal architecture. Initially, I built a standard **Vector-Only** system (using just FAISS embeddings). It seemed to work fine for basic questions, but when I evaluated it using LangSmith to test its performance on complex codebase queries, the metrics were disappointing. It struggled to find exact variable names and often returned irrelevant helper scripts instead of core architectural files.
 
