@@ -184,3 +184,43 @@ This mathematically guarantees that a code snippet which placed **#3 in Vector**
 RRF crowns the ultimate winning chunk IDs. The system takes these winning IDs, goes back to the **Master List (`chunks.pkl`)**, rips out the raw human-readable code for those specific functions, and hands them to the AI. 
 
 The AI reads this highly-targeted, perfectly verified code and synthesizes a flawlessly accurate response to your original question.
+
+---
+
+## Key Learnings
+
+Building a production-grade, AI-powered codebase search engine yielded several critical insights:
+
+1. **Pure Vector Search Fails for Code:** Standard vector embeddings (FAISS) are excellent at capturing semantic meaning, but they fail catastrophically at exact matches (like specific variable names or obscure function parameters). Code requires a hybrid approach.
+2. **PageRank Translates to Code Importance:** Applying Google's PageRank algorithm to a codebase's Abstract Syntax Tree (AST) brilliantly solved the "noisy retrieval" problem. It ensures that widely used utility functions naturally surface higher than isolated, one-off scripts.
+3. **RRF is the Great Equalizer:** When combining three entirely different retrieval systems, the mathematical scores are fundamentally incompatible (e.g., FAISS cosine similarity vs. BM25 TF-IDF scoring vs. PageRank centrality). Reciprocal Rank Fusion (RRF) proved absolutely vital for normalizing these lists into a single, highly accurate ranking purely based on position.
+4. **Empirical Evaluation Over "Vibes":** Implementing the LangSmith "LLM-as-a-Judge" pipeline was a game-changer. It transformed our evaluation process from subjective "vibes" into hard data, proving across 6 concrete metrics that the Tri-Modal approach vastly outperformed standard Vector search.
+
+---
+
+## Mistakes & Pitfalls (What Went Wrong)
+
+The evolution of Code Compass was not without its architectural hurdles. Here are the biggest mistakes made and how they were overcome:
+
+### 1. The 29-Second Timeout Trap
+Initially, we attempted to execute the heavy indexing pipeline (cloning, chunking, embedding, graphing) inside a single AWS Lambda function triggered directly by API Gateway. 
+* **The Mistake:** API Gateway enforces a strict, unchangeable 29-second timeout on all HTTP requests. Processing a mid-sized repository took several minutes, causing immediate 504 Gateway Timeouts.
+* **The Fix:** We decoupled the architecture into two distinct Lambdas. A lightning-fast **Dispatcher** immediately returns a `202 Accepted` to bypass the gateway timeout, and simultaneously triggers a heavy **Worker** Lambda asynchronously in the background.
+
+### 2. The Heavy Deployment Bottleneck
+When attempting to deploy the `RAG-Ingestion-Worker` Lambda, the deployment package ballooned to 68MB because it contained heavy ML libraries (FAISS, NetworkX).
+* **The Mistake:** Trying to deploy this massive `.zip` file directly via the AWS CLI (`update-function-code`) resulted in severe network timeouts and dropped connections.
+* **The Fix:** We implemented a two-step deployment pipeline. First, we push the 68MB package to an Amazon S3 bucket via a robust multipart upload. Second, we command Lambda to pull the code internally directly from S3 on the AWS backbone.
+
+### 3. The "Manual Cache" Anti-Pattern
+Early in development, caching was handled by a manual "Force Re-Index" button on the frontend. If a user pushed new code to GitHub, they had to remember to explicitly check the force box.
+* **The Mistake:** Relying on the user to manually manage cache invalidation is terrible UX and leads to the AI answering questions based on stale, outdated code.
+* **The Fix:** We implemented **Autonomous Smart Caching**. The Dispatcher now instantly hits the GitHub API (`/commits/HEAD`) to fetch the live commit SHA. It compares this against the SHA stored in DynamoDB. If they mismatch, it autonomously invalidates the cache and re-indexes the fresh code entirely behind the scenes.
+
+---
+
+## Conclusion
+
+Code Compass represents a paradigm shift in how developers interact with complex, undocumented repositories. By combining the semantic understanding of Large Language Models, the exact precision of Lexical Search, and the structural awareness of Graph Theory into a unified **Tri-Modal RAG Engine**, it bridges the gap between human language and machine logic. 
+
+Furthermore, by grounding this intelligence in a fully serverless, highly decoupled AWS architecture, the system is exceptionally resilient, infinitely scalable, and capable of indexing and comprehending entire codebases autonomously.
