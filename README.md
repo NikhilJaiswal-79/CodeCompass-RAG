@@ -10,6 +10,8 @@ Unlike traditional RAG systems that blindly chop text into chunks, CodeCompass u
 
 ## 🌟 Key Innovations
 
+![Tri-Modal RAG Engine Architecture](assets/architecture.jpg)
+
 ### 1. Tri-Modal Search (Vector + Keyword + PageRank)
 CodeCompass abandons standard vector-only search for a hyper-accurate Tri-Modal approach:
 * **Dense Vectors (FAISS):** Semantic conceptual matching.
@@ -29,6 +31,8 @@ Powered by **Claude 3.5 Haiku**, the reasoning engine is a true autonomous Agent
 5. **Robust Parsing:** Features a bulletproof fallback engine that mathematically intercepts and repairs malformed markdown responses from the LLM.
 
 ### 4. 100% Serverless AWS Architecture
+
+![AWS Serverless Flow](assets/aws_architecture.jpg)
 The backend is completely decoupled into a highly scalable cloud pipeline:
 - **Amazon Route 53 & CloudFront:** Manages the custom domain (`code-compass.app`) and globally distributes the frontend UI via a lightning-fast CDN with SSL encryption.
 - **AWS API Gateway:** Securely routes all incoming backend traffic.
@@ -40,6 +44,9 @@ The backend is completely decoupled into a highly scalable cloud pipeline:
 - **Amazon S3:** Persistently stores the massive FAISS, BM25, and Graph SQLite databases for instantaneous retrieval.
 
 ### 5. Premium Glassmorphic UI
+
+![Code Compass Interface](assets/ui_screenshot.png)
+
 Features a gorgeous, responsive UI built in vanilla HTML/CSS/JS that communicates directly with the cloud APIs, offering real-time streaming, smart caching, and force re-indexing controls.
 ### 6. Tech Stack & Libraries
 **Frontend:**
